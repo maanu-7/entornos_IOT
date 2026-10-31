@@ -1,0 +1,58 @@
+# Microservicio Spring Boot + su base de datos
+#   docker compose up -d --build     construir y arrancar
+#   docker compose logs -f api       ver el arranque de Spring
+#   docker compose down              parar (los datos siguen en el volumen)
+name: inventario
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: inventario
+      POSTGRES_USER: ${DB_USUARIO}
+      POSTGRES_PASSWORD: ${DB_CLAVE}
+    volumes:
+      - datos-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USUARIO} -d inventario"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    # sin "ports": la base de datos solo es accesible desde la red interna
+
+  api:
+    build: .
+    image: aula/inventario:1.0.0
+    ports:
+      - "${PUERTO_API:-8080}:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/inventario
+      SPRING_DATASOURCE_USERNAME: ${DB_USUARIO}
+      SPRING_DATASOURCE_PASSWORD: ${DB_CLAVE}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 30s
+    restart: unless-stopped
+
+  # Reto: Adminer para administrar PostgreSQL desde el navegador.
+  # Es el único camino a la base de datos desde fuera, y solo en el puerto 8081.
+  adminer:
+    image: adminer:4.8.1
+    ports:
+      - "${PUERTO_ADMINER:-8081}:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  datos-db:

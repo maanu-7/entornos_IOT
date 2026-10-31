@@ -1,0 +1,19 @@
+# Reto 1: mismo Dockerfile pero con el código copiado ANTES de instalar dependencias.
+# Construcción:  docker build -f Dockerfile.reto -t aula/simulador:reto .
+# Al cambiar simulador.py se invalida su capa y todas las siguientes,
+# así que pip install se vuelve a ejecutar en cada cambio de código.
+FROM python:3.13-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+COPY simulador.py .
+RUN pip install --no-cache-dir -r requirements.txt
+
+ENV MQTT_HOST=mosquitto \
+    SENSOR_ID=sensor01 \
+    PERIODO=2
+
+USER nobody
+
+CMD ["python", "simulador.py"]

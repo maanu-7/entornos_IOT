@@ -1,0 +1,101 @@
+# Entorno IoT del curso: broker MQTT + Node-RED + InfluxDB + Grafana
+#
+#   ./desplegar.sh                 arranca todo y espera a que esté listo
+#   docker compose ps              estado de los servicios
+#   docker compose logs -f grafana registro de un servicio
+#   docker compose down            para y borra los contenedores (los datos se conservan)
+#
+# Toda la configuración que cambia de un equipo a otro está en el fichero .env
+name: entorno-iot
+
+services:
+  # ---------------------------------------------------------------- transporte
+  mosquitto:
+    image: eclipse-mosquitto:2.0.22
+    container_name: ${PREFIJO:-iot}-mosquitto
+    ports:
+      - "${PUERTO_MQTT:-1883}:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-datos:/mosquitto/data
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/broker/uptime", "-C", "1", "-W", "3"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- procesamiento
+  nodered:
+    image: nodered/node-red:5.0.8
+    container_name: ${PREFIJO:-iot}-nodered
+    ports:
+      - "${PUERTO_NODERED:-1880}:1880"
+    volumes:
+      - nodered-datos:/data
+    environment:
+      TZ: ${TZ:-Europe/Madrid}
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    restart: unless-stopped
+    # la imagen ya trae su propio healthcheck
+
+  # ---------------------------------------------------------------- almacenamiento
+  influxdb:
+    image: influxdb:2.9
+    container_name: ${PREFIJO:-iot}-influxdb
+    ports:
+      - "${PUERTO_INFLUXDB:-8086}:8086"
+    volumes:
+      - influxdb-datos:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUX_USUARIO}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUX_CLAVE}
+      DOCKER_INFLUXDB_INIT_ORG: aula
+      DOCKER_INFLUXDB_INIT_BUCKET: sensores
+      DOCKER_INFLUXDB_INIT_RETENTION: 30d
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUX_TOKEN}
+      TZ: ${TZ:-Europe/Madrid}
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- visualización
+  grafana:
+    image: grafana/grafana:13.2.3
+    container_name: ${PREFIJO:-iot}-grafana
+    ports:
+      - "${PUERTO_GRAFANA:-3000}:3000"
+    volumes:
+      - grafana-datos:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USUARIO}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_CLAVE}
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      INFLUX_TOKEN: ${INFLUX_TOKEN}
+      TZ: ${TZ:-Europe/Madrid}
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health | grep -q ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  mosquitto-datos:
+  nodered-datos:
+  influxdb-datos:
+  influxdb-config:
+  grafana-datos:

@@ -1,0 +1,16 @@
+# Grafana crea este data source al arrancar: nadie tiene que configurarlo a mano
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB aula
+    uid: influxdb-aula
+    type: influxdb
+    access: proxy
+    url: http://influxdb:8086          # el nombre del servicio, no localhost
+    isDefault: true
+    jsonData:
+      version: Flux
+      organization: aula
+      defaultBucket: sensores
+    secureJsonData:
+      token: $INFLUX_TOKEN             # sale de una variable de entorno, no se escribe aquí

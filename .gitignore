@@ -1,0 +1,14 @@
+# Configuración real con contraseñas: se reparte .env.example
+.env
+
+# Copias de seguridad de los volúmenes (datos, no código; la de Grafana pesa más de 100 MB)
+copias/*.tar.gz
+
+# Material del curso tal como se descargó
+*.zip
+Apuntes_IoT_Industria_4_0.pdf
+
+# Restos de macOS y de compilación
+__MACOSX/
+.DS_Store
+target/

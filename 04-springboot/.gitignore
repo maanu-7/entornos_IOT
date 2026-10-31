@@ -1,0 +1,8 @@
+# Configuración con contraseñas: nunca al repositorio (se reparte .env.example)
+.env
+
+# Resultado de la compilación y ficheros del IDE
+target/
+.idea/
+.vscode/
+*.iml

@@ -1,0 +1,61 @@
+# Un broker MQTT, tres sensores simulados que publican en él y una web estática
+#   docker compose up -d --build      arrancar (y construir la imagen del simulador)
+#   docker compose logs -f            ver qué hacen
+#   docker compose down               parar y borrar los contenedores
+name: demo-sensores
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "${PUERTO_MQTT:-1883}:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/broker/uptime", "-C", "1", "-W", "3"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  sensor01:
+    build: ../02-simulador
+    image: aula/simulador:1.0
+    environment:
+      SENSOR_ID: sensor01
+      PERIODO: ${PERIODO:-2}
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    restart: unless-stopped
+
+  sensor02:
+    build: ../02-simulador
+    image: aula/simulador:1.0
+    environment:
+      SENSOR_ID: sensor02
+      PERIODO: ${PERIODO:-2}
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Paso 4: tercer sensor, misma imagen, solo cambia su identificador
+  sensor03:
+    image: aula/simulador:1.0
+    environment:
+      SENSOR_ID: sensor03
+      PERIODO: ${PERIODO:-2}
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Paso 4: la página de la práctica 01-web, servida por nginx en el puerto 8080
+  web:
+    image: nginx:alpine
+    ports:
+      - "${PUERTO_WEB:-8080}:80"
+    volumes:
+      - ../01-web/01-web/html:/usr/share/nginx/html:ro
+    restart: unless-stopped
